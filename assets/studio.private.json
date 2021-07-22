@@ -1,0 +1,3808 @@
+{
+  "description": "OIDP Flow",
+  "initial_state": "Trigger",  
+  "flags": {
+    "allow_concurrent_calls": true
+  },
+  "states": [
+    {
+      "name": "Trigger",
+      "type": "trigger",
+      "transitions": [
+        {
+          "next": "set_variables_sms",
+          "event": "incomingMessage"
+        },
+        {
+          "event": "incomingCall"
+        },
+        {
+          "next": "set_variables_rest_trigger",
+          "event": "incomingRequest"
+        }
+      ],
+      "properties": {
+        "offset": {
+          "x": 0,
+          "y": 30
+        }
+      }
+    },
+    {
+      "name": "function_get_user_record",
+      "type": "run-function",
+      "transitions": [
+        {
+          "next": "split_user",
+          "event": "success"
+        },
+        {
+          "event": "fail"
+        }
+      ],
+      "properties": {
+        "service_sid": "<SERVICE_SID>",
+        "environment_sid": "<ENVIRONMENT_SID>",
+        "offset": {
+          "x": -740,
+          "y": 260
+        },
+        "function_sid": "<FUNCTION_SID>/airtable/get-record-by-field",
+        "parameters": [
+          {
+            "value": "CUSTOMERS",
+            "key": "targetTable"
+          },
+          {
+            "value": "ContactID",
+            "key": "filterFieldName"
+          },
+          {
+            "value": "{{flow.variables.ContactID}}",
+            "key": "filterFieldValue"
+          }
+        ],
+        "url": "http://<URL_PREFIX>/airtable/get-record-by-field"
+      }
+    },
+    {
+      "name": "split_user",
+      "type": "split-based-on",
+      "transitions": [
+        {
+          "next": "send_new_user_welcome",
+          "event": "noMatch"
+        },
+        {
+          "next": "send_new_user_welcome",
+          "event": "match",
+          "conditions": [
+            {
+              "friendly_name": "No Record",
+              "arguments": [
+                "{{widgets.function_get_user_record.body}}"
+              ],
+              "type": "is_blank",
+              "value": "Is Blank"
+            }
+          ]
+        },
+        {
+          "next": "split_check_double_opt_in",
+          "event": "match",
+          "conditions": [
+            {
+              "friendly_name": "User Exists",
+              "arguments": [
+                "{{widgets.function_get_user_record.body}}"
+              ],
+              "type": "is_not_blank",
+              "value": "Is Not Blank"
+            }
+          ]
+        }
+      ],
+      "properties": {
+        "input": "{{widgets.function_get_user_record.body}}",
+        "offset": {
+          "x": -760,
+          "y": 510
+        }
+      }
+    },
+    {
+      "name": "send_new_user_welcome",
+      "type": "send-and-wait-for-reply",
+      "transitions": [
+        {
+          "next": "split_new_user_intent",
+          "event": "incomingMessage"
+        },
+        {
+          "event": "timeout"
+        },
+        {
+          "event": "deliveryFailure"
+        }
+      ],
+      "properties": {
+        "offset": {
+          "x": -1260,
+          "y": 540
+        },
+        "service": "{{trigger.message.InstanceSid}}",
+        "channel": "{{trigger.message.ChannelSid}}",
+        "from": "{{flow.channel.address}}",
+        "body": "Hi! Would you like to join? Reply YES.",
+        "timeout": "180"
+      }
+    },
+    {
+      "name": "not_configured_yet",
+      "type": "send-message",
+      "transitions": [
+        {
+          "event": "sent"
+        },
+        {
+          "event": "failed"
+        }
+      ],
+      "properties": {
+        "offset": {
+          "x": -140,
+          "y": 660
+        },
+        "service": "{{trigger.message.InstanceSid}}",
+        "channel": "{{trigger.message.ChannelSid}}",
+        "from": "{{flow.channel.address}}",
+        "to": "{{contact.channel.address}}",
+        "body": "This application has not been configured yet."
+      }
+    },
+    {
+      "name": "split_new_user_intent",
+      "type": "split-based-on",
+      "transitions": [
+        {
+          "next": "send_new_user_welcome",
+          "event": "noMatch"
+        },
+        {
+          "next": "send_request_name",
+          "event": "match",
+          "conditions": [
+            {
+              "friendly_name": "YES",
+              "arguments": [
+                "{{widgets.send_new_user_welcome.inbound.Body}}"
+              ],
+              "type": "matches_any_of",
+              "value": "yes,y"
+            }
+          ]
+        }
+      ],
+      "properties": {
+        "input": "{{widgets.send_new_user_welcome.inbound.Body}}",
+        "offset": {
+          "x": -1350,
+          "y": 760
+        }
+      }
+    },
+    {
+      "name": "send_request_name",
+      "type": "send-and-wait-for-reply",
+      "transitions": [
+        {
+          "next": "function_get_create_user_timestamp",
+          "event": "incomingMessage"
+        },
+        {
+          "event": "timeout"
+        },
+        {
+          "event": "deliveryFailure"
+        }
+      ],
+      "properties": {
+        "offset": {
+          "x": -1350,
+          "y": 1050
+        },
+        "service": "{{trigger.message.InstanceSid}}",
+        "channel": "{{trigger.message.ChannelSid}}",
+        "from": "{{flow.channel.address}}",
+        "body": "Please enter your name:",
+        "timeout": "180"
+      }
+    },
+    {
+      "name": "function_create_new_user",
+      "type": "run-function",
+      "transitions": [
+        {
+          "next": "send_sign_up_success",
+          "event": "success"
+        },
+        {
+          "event": "fail"
+        }
+      ],
+      "properties": {
+        "service_sid": "<SERVICE_SID>",
+        "environment_sid": "<ENVIRONMENT_SID>",
+        "offset": {
+          "x": -1550,
+          "y": 1550
+        },
+        "function_sid": "<FUNCTION_SID>/airtable/create-record",
+        "parameters": [
+          {
+            "value": "CUSTOMERS",
+            "key": "targetTable"
+          },
+          {
+            "value": "ContactID|Name|Created|DoubleOptIn",
+            "key": "fieldNames"
+          },
+          {
+            "value": "{{trigger.message.From}}|{{widgets.send_request_name.inbound.Body}}|{{widgets.function_get_create_user_timestamp.body}}|No",
+            "key": "fieldValues"
+          },
+          {
+            "value": "string|string|integer|string",
+            "key": "fieldTypes"
+          }
+        ],
+        "url": "http://<URL_PREFIX>/airtable/create-record"
+      }
+    },
+    {
+      "name": "send_sign_up_success",
+      "type": "send-message",
+      "transitions": [
+        {
+          "next": "function_get_user_record",
+          "event": "sent"
+        },
+        {
+          "event": "failed"
+        }
+      ],
+      "properties": {
+        "offset": {
+          "x": -1450,
+          "y": 1830
+        },
+        "service": "{{trigger.message.InstanceSid}}",
+        "channel": "{{trigger.message.ChannelSid}}",
+        "from": "{{flow.channel.address}}",
+        "to": "{{contact.channel.address}}",
+        "body": "Excellent! We've got you registered. Let's get started..."
+      }
+    },
+    {
+      "name": "set_variables_sms",
+      "type": "set-variables",
+      "transitions": [
+        {
+          "next": "function_get_trigger_log_timestamp",
+          "event": "next"
+        }
+      ],
+      "properties": {
+        "variables": [
+          {
+            "value": "sms",
+            "key": "startSource"
+          },
+          {
+            "value": "{{trigger.message.Body}}",
+            "key": "startParameter"
+          },
+          {
+            "value": "{{trigger.message.From}}",
+            "key": "ContactID"
+          }
+        ],
+        "offset": {
+          "x": -760,
+          "y": -240
+        }
+      }
+    },
+    {
+      "name": "set_variables_rest_trigger",
+      "type": "set-variables",
+      "transitions": [
+        {
+          "next": "function_get_trigger_log_timestamp",
+          "event": "next"
+        }
+      ],
+      "properties": {
+        "variables": [
+          {
+            "value": "rest",
+            "key": "startSource"
+          },
+          {
+            "value": "{{trigger.request.parameters.startParameter}}",
+            "key": "startParameter"
+          },
+          {
+            "value": "{{trigger.request.to}}",
+            "key": "ContactID"
+          }
+        ],
+        "offset": {
+          "x": -330,
+          "y": -240
+        }
+      }
+    },
+    {
+      "name": "function_get_create_user_timestamp",
+      "type": "run-function",
+      "transitions": [
+        {
+          "next": "function_create_new_user",
+          "event": "success"
+        },
+        {
+          "event": "fail"
+        }
+      ],
+      "properties": {
+        "service_sid": "<SERVICE_SID>",
+        "environment_sid": "<ENVIRONMENT_SID>",
+        "offset": {
+          "x": -1540,
+          "y": 1260
+        },
+        "function_sid": "<FUNCTION_SID>/utilities/return-timestamp",
+        "url": "http://<URL_PREFIX>/utilities/return-timestamp"
+      }
+    },
+    {
+      "name": "split_check_double_opt_in",
+      "type": "split-based-on",
+      "transitions": [
+        {
+          "event": "noMatch"
+        },
+        {
+          "next": "split_route_active_application",
+          "event": "match",
+          "conditions": [
+            {
+              "friendly_name": "YES",
+              "arguments": [
+                "{{widgets.function_get_user_record.parsed.DoubleOptIn}}"
+              ],
+              "type": "matches_any_of",
+              "value": "YES,Yes,yes"
+            }
+          ]
+        },
+        {
+          "next": "send_and_reply_confirm_double_opt_in",
+          "event": "match",
+          "conditions": [
+            {
+              "friendly_name": "NO",
+              "arguments": [
+                "{{widgets.function_get_user_record.parsed.DoubleOptIn}}"
+              ],
+              "type": "matches_any_of",
+              "value": "NO,No,no"
+            }
+          ]
+        },
+        {
+          "next": "send_and_reply_confirm_double_opt_in",
+          "event": "match",
+          "conditions": [
+            {
+              "friendly_name": "Empty",
+              "arguments": [
+                "{{widgets.function_get_user_record.parsed.DoubleOptIn}}"
+              ],
+              "type": "is_blank",
+              "value": "Is Blank"
+            }
+          ]
+        }
+      ],
+      "properties": {
+        "input": "{{widgets.function_get_user_record.parsed.DoubleOptIn}}",
+        "offset": {
+          "x": -640,
+          "y": 820
+        }
+      }
+    },
+    {
+      "name": "send_and_reply_confirm_double_opt_in",
+      "type": "send-and-wait-for-reply",
+      "transitions": [
+        {
+          "next": "split_check_double_opt_in_confirm",
+          "event": "incomingMessage"
+        },
+        {
+          "next": "send_maybe_later",
+          "event": "timeout"
+        },
+        {
+          "event": "deliveryFailure"
+        }
+      ],
+      "properties": {
+        "offset": {
+          "x": -910,
+          "y": 1140
+        },
+        "service": "{{trigger.message.InstanceSid}}",
+        "channel": "{{trigger.message.ChannelSid}}",
+        "from": "{{flow.channel.address}}",
+        "body": "Hello, please confirm that you would like to receive messages from this service.\n\nMsg & data rates may apply. T&Cs: http://twil.io\n\nTo continue, reply OK.",
+        "timeout": "180"
+      }
+    },
+    {
+      "name": "split_check_double_opt_in_confirm",
+      "type": "split-based-on",
+      "transitions": [
+        {
+          "next": "send_and_reply_confirm_double_opt_in",
+          "event": "noMatch"
+        },
+        {
+          "next": "function_update_double_opt_in",
+          "event": "match",
+          "conditions": [
+            {
+              "friendly_name": "OK",
+              "arguments": [
+                "{{widgets.send_and_reply_confirm_double_opt_in.inbound.Body}}"
+              ],
+              "type": "equal_to",
+              "value": "OK"
+            }
+          ]
+        }
+      ],
+      "properties": {
+        "input": "{{widgets.send_and_reply_confirm_double_opt_in.inbound.Body}}",
+        "offset": {
+          "x": -820,
+          "y": 1460
+        }
+      }
+    },
+    {
+      "name": "send_maybe_later",
+      "type": "send-message",
+      "transitions": [
+        {
+          "event": "sent"
+        },
+        {
+          "event": "failed"
+        }
+      ],
+      "properties": {
+        "offset": {
+          "x": -1210,
+          "y": 1420
+        },
+        "service": "{{trigger.message.InstanceSid}}",
+        "channel": "{{trigger.message.ChannelSid}}",
+        "from": "{{flow.channel.address}}",
+        "to": "{{contact.channel.address}}",
+        "body": "OK, maybe later!"
+      }
+    },
+    {
+      "name": "function_update_double_opt_in",
+      "type": "run-function",
+      "transitions": [
+        {
+          "next": "send_post_double_optin",
+          "event": "success"
+        },
+        {
+          "event": "fail"
+        }
+      ],
+      "properties": {
+        "service_sid": "<SERVICE_SID>",
+        "environment_sid": "<ENVIRONMENT_SID>",
+        "offset": {
+          "x": -900,
+          "y": 1780
+        },
+        "function_sid": "<FUNCTION_SID>/airtable/update-record",
+        "parameters": [
+          {
+            "value": "CUSTOMERS",
+            "key": "targetTable"
+          },
+          {
+            "value": "DoubleOptIn",
+            "key": "fieldNames"
+          },
+          {
+            "value": "Yes",
+            "key": "fieldValues"
+          },
+          {
+            "value": "string",
+            "key": "fieldTypes"
+          },
+          {
+            "value": "{{widgets.function_get_user_record.parsed.id}}",
+            "key": "record_id"
+          }
+        ],
+        "url": "http://<URL_PREFIX>/airtable/update-record"
+      }
+    },
+    {
+      "name": "send_post_double_optin",
+      "type": "send-message",
+      "transitions": [
+        {
+          "next": "function_get_user_record",
+          "event": "sent"
+        },
+        {
+          "event": "failed"
+        }
+      ],
+      "properties": {
+        "offset": {
+          "x": -1080,
+          "y": 2050
+        },
+        "service": "{{trigger.message.InstanceSid}}",
+        "channel": "{{trigger.message.ChannelSid}}",
+        "from": "{{flow.channel.address}}",
+        "to": "{{contact.channel.address}}",
+        "body": "Excellent! You are now fully registered!\n\n\nText HELP for help, STOP to unsubscribe at any time."
+      }
+    },
+    {
+      "name": "function_get_app_parameters",
+      "type": "run-function",
+      "transitions": [
+        {
+          "next": "function_get_user_record",
+          "event": "success"
+        },
+        {
+          "event": "fail"
+        }
+      ],
+      "properties": {
+        "service_sid": "<SERVICE_SID>",
+        "environment_sid": "<ENVIRONMENT_SID>",
+        "offset": {
+          "x": -690,
+          "y": -10
+        },
+        "function_sid": "<FUNCTION_SID>/system/return-all-variables",
+        "parameters": [
+          {
+            "value": "YES",
+            "key": "fromStudio"
+          }
+        ],
+        "url": "http://<URL_PREFIX>/system/return-all-variables"
+      }
+    },
+    {
+      "name": "split_route_active_application",
+      "type": "split-based-on",
+      "transitions": [
+        {
+          "next": "not_configured_yet",
+          "event": "noMatch"
+        },
+        {
+          "next": "not_configured_yet",
+          "event": "match",
+          "conditions": [
+            {
+              "friendly_name": "NOT SET",
+              "arguments": [
+                "{{widgets.function_get_app_parameters.parsed.APP-Active_Application}}"
+              ],
+              "type": "equal_to",
+              "value": "<NOT SET>"
+            }
+          ]
+        },
+        {
+          "next": "send_start_survey",
+          "event": "match",
+          "conditions": [
+            {
+              "friendly_name": "SURVEY",
+              "arguments": [
+                "{{widgets.function_get_app_parameters.parsed.APP-Active_Application}}"
+              ],
+              "type": "equal_to",
+              "value": "SURVEY"
+            }
+          ]
+        },
+        {
+          "next": "function_get_user_appointment",
+          "event": "match",
+          "conditions": [
+            {
+              "friendly_name": "APPOINTMENT",
+              "arguments": [
+                "{{widgets.function_get_app_parameters.parsed.APP-Active_Application}}"
+              ],
+              "type": "equal_to",
+              "value": "APPOINTMENT"
+            }
+          ]
+        },
+        {
+          "next": "function_get_current_order",
+          "event": "match",
+          "conditions": [
+            {
+              "friendly_name": "ORDERING",
+              "arguments": [
+                "{{widgets.function_get_app_parameters.parsed.APP-Active_Application}}"
+              ],
+              "type": "equal_to",
+              "value": "ORDER"
+            }
+          ]
+        },
+        {
+          "next": "send_beatles_game",
+          "event": "match",
+          "conditions": [
+            {
+              "friendly_name": "GAME",
+              "arguments": [
+                "{{widgets.function_get_app_parameters.parsed.APP-Active_Application}}"
+              ],
+              "type": "equal_to",
+              "value": "GAME"
+            }
+          ]
+        },
+        {
+          "next": "function_get_current_queue",
+          "event": "match",
+          "conditions": [
+            {
+              "friendly_name": "QUEUE",
+              "arguments": [
+                "{{widgets.function_get_app_parameters.parsed.APP-Active_Application}}"
+              ],
+              "type": "equal_to",
+              "value": "QUEUE"
+            }
+          ]
+        }
+      ],
+      "properties": {
+        "input": "{{widgets.function_get_app_parameters.parsed.APP-Active_Application}}",
+        "offset": {
+          "x": 50,
+          "y": 250
+        }
+      }
+    },
+    {
+      "name": "function_get_trigger_log_timestamp",
+      "type": "run-function",
+      "transitions": [
+        {
+          "next": "function_log_trigger",
+          "event": "success"
+        },
+        {
+          "event": "fail"
+        }
+      ],
+      "properties": {
+        "service_sid": "<SERVICE_SID>",
+        "environment_sid": "<ENVIRONMENT_SID>",
+        "offset": {
+          "x": -1240,
+          "y": -240
+        },
+        "function_sid": "<FUNCTION_SID>/utilities/return-timestamp",
+        "url": "http://<URL_PREFIX>/utilities/return-timestamp"
+      }
+    },
+    {
+      "name": "function_log_trigger",
+      "type": "run-function",
+      "transitions": [
+        {
+          "next": "function_get_app_parameters",
+          "event": "success"
+        },
+        {
+          "event": "fail"
+        }
+      ],
+      "properties": {
+        "service_sid": "<SERVICE_SID>",
+        "environment_sid": "<ENVIRONMENT_SID>",
+        "offset": {
+          "x": -1290,
+          "y": -20
+        },
+        "function_sid": "<FUNCTION_SID>/airtable/create-record",
+        "parameters": [
+          {
+            "value": "TRIGGER_LOG",
+            "key": "targetTable"
+          },
+          {
+            "value": "ContactID|TRIGGER|STARTPARAM|TIMESTAMP",
+            "key": "fieldNames"
+          },
+          {
+            "value": "{{flow.variables.ContactID}}|{{flow.variables.startSource}}|{{flow.variables.startParameter}}|{{widgets.function_get_trigger_log_timestamp.body}}",
+            "key": "fieldValues"
+          },
+          {
+            "value": "string|string|string|integer",
+            "key": "fieldTypes"
+          }
+        ],
+        "url": "http://<URL_PREFIX>/airtable/create-record"
+      }
+    },
+    {
+      "name": "send_start_survey",
+      "type": "send-and-wait-for-reply",
+      "transitions": [
+        {
+          "next": "function_get_survey_timestamp",
+          "event": "incomingMessage"
+        },
+        {
+          "event": "timeout"
+        },
+        {
+          "event": "deliveryFailure"
+        }
+      ],
+      "properties": {
+        "offset": {
+          "x": 290,
+          "y": 640
+        },
+        "service": "{{trigger.message.InstanceSid}}",
+        "channel": "{{trigger.message.ChannelSid}}",
+        "from": "{{flow.channel.address}}",
+        "body": "Thank you for taking our survey. Ready to begin?",
+        "timeout": "180"
+      }
+    },
+    {
+      "name": "set_survey_index",
+      "type": "set-variables",
+      "transitions": [
+        {
+          "next": "function_get_next_question",
+          "event": "next"
+        }
+      ],
+      "properties": {
+        "variables": [
+          {
+            "value": "0",
+            "key": "survey_index"
+          }
+        ],
+        "offset": {
+          "x": 130,
+          "y": 1190
+        }
+      }
+    },
+    {
+      "name": "function_get_next_question",
+      "type": "run-function",
+      "transitions": [
+        {
+          "next": "send_survey_question",
+          "event": "success"
+        },
+        {
+          "event": "fail"
+        }
+      ],
+      "properties": {
+        "service_sid": "<SERVICE_SID>",
+        "environment_sid": "<ENVIRONMENT_SID>",
+        "offset": {
+          "x": 510,
+          "y": 1200
+        },
+        "function_sid": "<FUNCTION_SID>/airtable/get-record-by-field",
+        "parameters": [
+          {
+            "value": "SURVEY_QUESTIONS",
+            "key": "targetTable"
+          },
+          {
+            "value": "QUESTION_INDEX",
+            "key": "filterFieldName"
+          },
+          {
+            "value": "{{flow.variables.survey_index}}",
+            "key": "filterFieldValue"
+          }
+        ],
+        "url": "http://<URL_PREFIX>/airtable/get-record-by-field"
+      }
+    },
+    {
+      "name": "function_get_survey_timestamp",
+      "type": "run-function",
+      "transitions": [
+        {
+          "next": "function_create_new_survey_response",
+          "event": "success"
+        },
+        {
+          "event": "fail"
+        }
+      ],
+      "properties": {
+        "service_sid": "<SERVICE_SID>",
+        "environment_sid": "<ENVIRONMENT_SID>",
+        "offset": {
+          "x": 460,
+          "y": 930
+        },
+        "function_sid": "<FUNCTION_SID>/utilities/return-timestamp",
+        "url": "http://<URL_PREFIX>/utilities/return-timestamp"
+      }
+    },
+    {
+      "name": "function_create_new_survey_response",
+      "type": "run-function",
+      "transitions": [
+        {
+          "next": "set_survey_index",
+          "event": "success"
+        },
+        {
+          "event": "fail"
+        }
+      ],
+      "properties": {
+        "service_sid": "<SERVICE_SID>",
+        "environment_sid": "<ENVIRONMENT_SID>",
+        "offset": {
+          "x": 130,
+          "y": 940
+        },
+        "function_sid": "<FUNCTION_SID>/airtable/create-record",
+        "parameters": [
+          {
+            "value": "SURVEY_ANSWERS",
+            "key": "targetTable"
+          },
+          {
+            "value": "ContactID|STARTED",
+            "key": "fieldNames"
+          },
+          {
+            "value": "{{flow.variables.ContactID}}|{{widgets.function_get_survey_timestamp.body}}",
+            "key": "fieldValues"
+          },
+          {
+            "value": "string|integer",
+            "key": "fieldTypes"
+          }
+        ],
+        "url": "http://<URL_PREFIX>/airtable/create-record"
+      }
+    },
+    {
+      "name": "send_survey_question",
+      "type": "send-and-wait-for-reply",
+      "transitions": [
+        {
+          "next": "set_current_survey_question",
+          "event": "incomingMessage"
+        },
+        {
+          "event": "timeout"
+        },
+        {
+          "event": "deliveryFailure"
+        }
+      ],
+      "properties": {
+        "offset": {
+          "x": 510,
+          "y": 1500
+        },
+        "service": "{{trigger.message.InstanceSid}}",
+        "channel": "{{trigger.message.ChannelSid}}",
+        "from": "{{flow.channel.address}}",
+        "body": "{{widgets.function_get_next_question.parsed.QUESTION}}",
+        "timeout": "180"
+      }
+    },
+    {
+      "name": "function_record_survey_answer",
+      "type": "run-function",
+      "transitions": [
+        {
+          "next": "increment_survey_index",
+          "event": "success"
+        },
+        {
+          "event": "fail"
+        }
+      ],
+      "properties": {
+        "service_sid": "<SERVICE_SID>",
+        "environment_sid": "<ENVIRONMENT_SID>",
+        "offset": {
+          "x": 130,
+          "y": 1730
+        },
+        "function_sid": "<FUNCTION_SID>/airtable/update-record",
+        "parameters": [
+          {
+            "value": "SURVEY_ANSWERS",
+            "key": "targetTable"
+          },
+          {
+            "value": "{{flow.variables.current_survey_question}}",
+            "key": "fieldNames"
+          },
+          {
+            "value": "{{widgets.send_survey_question.inbound.Body}}",
+            "key": "fieldValues"
+          },
+          {
+            "value": "string",
+            "key": "fieldTypes"
+          },
+          {
+            "value": "{{widgets.function_create_new_survey_response.parsed.id}}",
+            "key": "record_id"
+          }
+        ],
+        "url": "http://<URL_PREFIX>/airtable/update-record"
+      }
+    },
+    {
+      "name": "increment_survey_index",
+      "type": "set-variables",
+      "transitions": [
+        {
+          "next": "split_check_survey_index",
+          "event": "next"
+        }
+      ],
+      "properties": {
+        "variables": [
+          {
+            "value": "{{flow.variables.survey_index | plus: 1}}",
+            "key": "survey_index"
+          }
+        ],
+        "offset": {
+          "x": 490,
+          "y": 1750
+        }
+      }
+    },
+    {
+      "name": "split_check_survey_index",
+      "type": "split-based-on",
+      "transitions": [
+        {
+          "event": "noMatch"
+        },
+        {
+          "next": "function_get_next_question",
+          "event": "match",
+          "conditions": [
+            {
+              "friendly_name": "< 3",
+              "arguments": [
+                "{{flow.variables.survey_index}}"
+              ],
+              "type": "less_than",
+              "value": "3"
+            }
+          ]
+        },
+        {
+          "next": "function_get_survey_complete_timestamp",
+          "event": "match",
+          "conditions": [
+            {
+              "friendly_name": "If value equal_to 3",
+              "arguments": [
+                "{{flow.variables.survey_index}}"
+              ],
+              "type": "equal_to",
+              "value": "3"
+            }
+          ]
+        }
+      ],
+      "properties": {
+        "input": "{{flow.variables.survey_index}}",
+        "offset": {
+          "x": 490,
+          "y": 2000
+        }
+      }
+    },
+    {
+      "name": "send_survey_thank_you",
+      "type": "send-message",
+      "transitions": [
+        {
+          "event": "sent"
+        },
+        {
+          "event": "failed"
+        }
+      ],
+      "properties": {
+        "offset": {
+          "x": 540,
+          "y": 2270
+        },
+        "service": "{{trigger.message.InstanceSid}}",
+        "channel": "{{trigger.message.ChannelSid}}",
+        "from": "{{flow.channel.address}}",
+        "to": "{{contact.channel.address}}",
+        "body": "Thank you for completing the survey!"
+      }
+    },
+    {
+      "name": "set_current_survey_question",
+      "type": "set-variables",
+      "transitions": [
+        {
+          "next": "function_record_survey_answer",
+          "event": "next"
+        }
+      ],
+      "properties": {
+        "variables": [
+          {
+            "value": "{{ \"QUESTION_\" | append: flow.variables.survey_index }}",
+            "key": "current_survey_question"
+          }
+        ],
+        "offset": {
+          "x": 160,
+          "y": 1460
+        }
+      }
+    },
+    {
+      "name": "function_record_survey_completed",
+      "type": "run-function",
+      "transitions": [
+        {
+          "next": "send_survey_thank_you",
+          "event": "success"
+        },
+        {
+          "event": "fail"
+        }
+      ],
+      "properties": {
+        "service_sid": "<SERVICE_SID>",
+        "environment_sid": "<ENVIRONMENT_SID>",
+        "offset": {
+          "x": 170,
+          "y": 2270
+        },
+        "function_sid": "<FUNCTION_SID>/airtable/update-record",
+        "parameters": [
+          {
+            "value": "SURVEY_ANSWERS",
+            "key": "targetTable"
+          },
+          {
+            "value": "COMPLETED",
+            "key": "fieldNames"
+          },
+          {
+            "value": "{{widgets.function_get_survey_complete_timestamp.body}}",
+            "key": "fieldValues"
+          },
+          {
+            "value": "integer",
+            "key": "fieldTypes"
+          },
+          {
+            "value": "{{widgets.function_create_new_survey_response.parsed.id}}",
+            "key": "record_id"
+          }
+        ],
+        "url": "http://<URL_PREFIX>/airtable/update-record"
+      }
+    },
+    {
+      "name": "function_get_survey_complete_timestamp",
+      "type": "run-function",
+      "transitions": [
+        {
+          "next": "function_record_survey_completed",
+          "event": "success"
+        },
+        {
+          "event": "fail"
+        }
+      ],
+      "properties": {
+        "service_sid": "<SERVICE_SID>",
+        "environment_sid": "<ENVIRONMENT_SID>",
+        "offset": {
+          "x": 140,
+          "y": 2010
+        },
+        "function_sid": "<FUNCTION_SID>/utilities/return-timestamp",
+        "url": "http://<URL_PREFIX>/utilities/return-timestamp"
+      }
+    },
+    {
+      "name": "split_source_appointment",
+      "type": "split-based-on",
+      "transitions": [
+        {
+          "event": "noMatch"
+        },
+        {
+          "next": "send_appointment_details",
+          "event": "match",
+          "conditions": [
+            {
+              "friendly_name": "SMS",
+              "arguments": [
+                "{{flow.variables.startSource}}"
+              ],
+              "type": "equal_to",
+              "value": "sms"
+            }
+          ]
+        },
+        {
+          "next": "function_get_confirmation_code",
+          "event": "match",
+          "conditions": [
+            {
+              "friendly_name": "rest",
+              "arguments": [
+                "{{flow.variables.startSource}}"
+              ],
+              "type": "equal_to",
+              "value": "rest"
+            }
+          ]
+        }
+      ],
+      "properties": {
+        "input": "{{flow.variables.startSource}}",
+        "offset": {
+          "x": 1690,
+          "y": 830
+        }
+      }
+    },
+    {
+      "name": "function_get_random_appointment",
+      "type": "run-function",
+      "transitions": [
+        {
+          "next": "function_create_new_appointment",
+          "event": "success"
+        },
+        {
+          "event": "fail"
+        }
+      ],
+      "properties": {
+        "service_sid": "<SERVICE_SID>",
+        "environment_sid": "<ENVIRONMENT_SID>",
+        "offset": {
+          "x": 1100,
+          "y": 1080
+        },
+        "function_sid": "<FUNCTION_SID>/apps/appointments/return-appointment-data",
+        "url": "http://<URL_PREFIX>/apps/appointments/return-appointment-data"
+      }
+    },
+    {
+      "name": "function_get_user_appointment",
+      "type": "run-function",
+      "transitions": [
+        {
+          "next": "split_appointment_exists",
+          "event": "success"
+        },
+        {
+          "event": "fail"
+        }
+      ],
+      "properties": {
+        "service_sid": "<SERVICE_SID>",
+        "environment_sid": "<ENVIRONMENT_SID>",
+        "offset": {
+          "x": 1480,
+          "y": 570
+        },
+        "function_sid": "<FUNCTION_SID>/airtable/get-record-by-field",
+        "parameters": [
+          {
+            "value": "APPOINTMENTS",
+            "key": "targetTable"
+          },
+          {
+            "value": "ContactID",
+            "key": "filterFieldName"
+          },
+          {
+            "value": "{{flow.variables.ContactID}}",
+            "key": "filterFieldValue"
+          }
+        ],
+        "url": "http://<URL_PREFIX>/airtable/get-record-by-field"
+      }
+    },
+    {
+      "name": "split_appointment_exists",
+      "type": "split-based-on",
+      "transitions": [
+        {
+          "event": "noMatch"
+        },
+        {
+          "next": "function_get_random_appointment",
+          "event": "match",
+          "conditions": [
+            {
+              "friendly_name": "No Record",
+              "arguments": [
+                "{{widgets.function_get_user_appointment.body}}"
+              ],
+              "type": "is_blank",
+              "value": "Is Blank"
+            }
+          ]
+        },
+        {
+          "next": "split_source_appointment",
+          "event": "match",
+          "conditions": [
+            {
+              "friendly_name": "User Exists",
+              "arguments": [
+                "{{widgets.function_get_user_appointment.body}}"
+              ],
+              "type": "is_not_blank",
+              "value": "Is Not Blank"
+            }
+          ]
+        }
+      ],
+      "properties": {
+        "input": "{{widgets.function_get_user_appointment.body}}",
+        "offset": {
+          "x": 1070,
+          "y": 780
+        }
+      }
+    },
+    {
+      "name": "function_create_new_appointment",
+      "type": "run-function",
+      "transitions": [
+        {
+          "next": "function_get_user_appointment",
+          "event": "success"
+        },
+        {
+          "event": "fail"
+        }
+      ],
+      "properties": {
+        "service_sid": "<SERVICE_SID>",
+        "environment_sid": "<ENVIRONMENT_SID>",
+        "offset": {
+          "x": 1020,
+          "y": 1400
+        },
+        "function_sid": "<FUNCTION_SID>/airtable/create-record",
+        "parameters": [
+          {
+            "value": "APPOINTMENTS",
+            "key": "targetTable"
+          },
+          {
+            "value": "ContactID|DAY|TIME",
+            "key": "fieldNames"
+          },
+          {
+            "value": "{{flow.variables.ContactID}}|{{widgets.function_get_random_appointment.parsed.day}}|{{widgets.function_get_random_appointment.parsed.time}}",
+            "key": "fieldValues"
+          },
+          {
+            "value": "string|string|string",
+            "key": "fieldTypes"
+          }
+        ],
+        "url": "http://<URL_PREFIX>/airtable/create-record"
+      }
+    },
+    {
+      "name": "send_appointment_details",
+      "type": "send-and-wait-for-reply",
+      "transitions": [
+        {
+          "next": "send_confirm_or_change",
+          "event": "incomingMessage"
+        },
+        {
+          "event": "timeout"
+        },
+        {
+          "event": "deliveryFailure"
+        }
+      ],
+      "properties": {
+        "offset": {
+          "x": 1580,
+          "y": 1140
+        },
+        "service": "{{trigger.message.InstanceSid}}",
+        "channel": "{{trigger.message.ChannelSid}}",
+        "from": "{{flow.channel.address}}",
+        "body": "Hello, we see that you have an appointment scheduled for {{widgets.function_get_user_appointment.parsed.DAY}} @ {{widgets.function_get_user_appointment.parsed.TIME}}. \n\nAre you contacting us about that appointment?",
+        "timeout": "180"
+      }
+    },
+    {
+      "name": "send_reminder",
+      "type": "send-and-wait-for-reply",
+      "transitions": [
+        {
+          "next": "split_1",
+          "event": "incomingMessage"
+        },
+        {
+          "event": "timeout"
+        },
+        {
+          "event": "deliveryFailure"
+        }
+      ],
+      "properties": {
+        "offset": {
+          "x": 2130,
+          "y": 1520
+        },
+        "service": "{{trigger.message.InstanceSid}}",
+        "channel": "{{trigger.message.ChannelSid}}",
+        "from": "{{flow.channel.address}}",
+        "body": "Hello, you have an appointment {{widgets.function_get_user_appointment.parsed.DAY}} @ {{widgets.function_get_user_appointment.parsed.TIME}}. \n\nPlease reply \"{{flow.variables.appointment_confirmation_code}}\" to conform.\n\nReply CHANGE to make changes.",
+        "timeout": "180"
+      }
+    },
+    {
+      "name": "function_get_confirmation_code",
+      "type": "run-function",
+      "transitions": [
+        {
+          "next": "set_confirmation_code",
+          "event": "success"
+        },
+        {
+          "event": "fail"
+        }
+      ],
+      "properties": {
+        "service_sid": "<SERVICE_SID>",
+        "environment_sid": "<ENVIRONMENT_SID>",
+        "offset": {
+          "x": 2110,
+          "y": 1040
+        },
+        "function_sid": "<FUNCTION_SID>/utilities/return-random-3-digit-number",
+        "url": "http://<URL_PREFIX>/utilities/return-random-3-digit-number"
+      }
+    },
+    {
+      "name": "set_confirmation_code",
+      "type": "set-variables",
+      "transitions": [
+        {
+          "next": "send_reminder",
+          "event": "next"
+        }
+      ],
+      "properties": {
+        "variables": [
+          {
+            "value": "{{ \"Yes \" | append: widgets.function_get_confirmation_code.body }}",
+            "key": "appointment_confirmation_code"
+          }
+        ],
+        "offset": {
+          "x": 2110,
+          "y": 1280
+        }
+      }
+    },
+    {
+      "name": "split_1",
+      "type": "split-based-on",
+      "transitions": [
+        {
+          "next": "send_reminder",
+          "event": "noMatch"
+        },
+        {
+          "next": "function_get_inbound_appt_timestamp",
+          "event": "match",
+          "conditions": [
+            {
+              "friendly_name": "VALID CODE",
+              "arguments": [
+                "{{widgets.send_reminder.inbound.Body}}"
+              ],
+              "type": "equal_to",
+              "value": "{{flow.variables.appointment_confirmation_code}}"
+            }
+          ]
+        },
+        {
+          "next": "function_get_appointment_options",
+          "event": "match",
+          "conditions": [
+            {
+              "friendly_name": "CHANGE",
+              "arguments": [
+                "{{widgets.send_reminder.inbound.Body}}"
+              ],
+              "type": "equal_to",
+              "value": "CHANGE"
+            }
+          ]
+        }
+      ],
+      "properties": {
+        "input": "{{widgets.send_reminder.inbound.Body}}",
+        "offset": {
+          "x": 1970,
+          "y": 1810
+        }
+      }
+    },
+    {
+      "name": "send_appointment_confirmed",
+      "type": "send-message",
+      "transitions": [
+        {
+          "event": "sent"
+        },
+        {
+          "event": "failed"
+        }
+      ],
+      "properties": {
+        "offset": {
+          "x": 1140,
+          "y": 2750
+        },
+        "service": "{{trigger.message.InstanceSid}}",
+        "channel": "{{trigger.message.ChannelSid}}",
+        "from": "{{flow.channel.address}}",
+        "to": "{{contact.channel.address}}",
+        "body": "Excellent! See you then!"
+      }
+    },
+    {
+      "name": "send_confirm_or_change",
+      "type": "send-and-wait-for-reply",
+      "transitions": [
+        {
+          "next": "split_inbound_appt",
+          "event": "incomingMessage"
+        },
+        {
+          "event": "timeout"
+        },
+        {
+          "event": "deliveryFailure"
+        }
+      ],
+      "properties": {
+        "offset": {
+          "x": 1460,
+          "y": 1430
+        },
+        "service": "{{trigger.message.InstanceSid}}",
+        "channel": "{{trigger.message.ChannelSid}}",
+        "from": "{{flow.channel.address}}",
+        "body": "Do you want to CONFIRM or CHANGE?",
+        "timeout": "180"
+      }
+    },
+    {
+      "name": "function_get_inbound_appt_timestamp",
+      "type": "run-function",
+      "transitions": [
+        {
+          "next": "function_update_appointment",
+          "event": "success"
+        },
+        {
+          "event": "fail"
+        }
+      ],
+      "properties": {
+        "service_sid": "<SERVICE_SID>",
+        "environment_sid": "<ENVIRONMENT_SID>",
+        "offset": {
+          "x": 1170,
+          "y": 2130
+        },
+        "function_sid": "<FUNCTION_SID>/utilities/return-timestamp",
+        "url": "http://<URL_PREFIX>/utilities/return-timestamp"
+      }
+    },
+    {
+      "name": "split_inbound_appt",
+      "type": "split-based-on",
+      "transitions": [
+        {
+          "next": "send_confirm_or_change",
+          "event": "noMatch"
+        },
+        {
+          "next": "function_get_inbound_appt_timestamp",
+          "event": "match",
+          "conditions": [
+            {
+              "friendly_name": "CONFIRM",
+              "arguments": [
+                "{{widgets.send_confirm_or_change.inbound.Body}}"
+              ],
+              "type": "equal_to",
+              "value": "confirm"
+            }
+          ]
+        },
+        {
+          "next": "function_get_appointment_options",
+          "event": "match",
+          "conditions": [
+            {
+              "friendly_name": "CHANGE",
+              "arguments": [
+                "{{widgets.send_confirm_or_change.inbound.Body}}"
+              ],
+              "type": "equal_to",
+              "value": "change"
+            }
+          ]
+        }
+      ],
+      "properties": {
+        "input": "{{widgets.send_confirm_or_change.inbound.Body}}",
+        "offset": {
+          "x": 1280,
+          "y": 1810
+        }
+      }
+    },
+    {
+      "name": "function_update_appointment",
+      "type": "run-function",
+      "transitions": [
+        {
+          "next": "send_appointment_confirmed",
+          "event": "success"
+        },
+        {
+          "event": "fail"
+        }
+      ],
+      "properties": {
+        "service_sid": "<SERVICE_SID>",
+        "environment_sid": "<ENVIRONMENT_SID>",
+        "offset": {
+          "x": 1230,
+          "y": 2410
+        },
+        "function_sid": "<FUNCTION_SID>/airtable/update-record",
+        "parameters": [
+          {
+            "value": "APPOINTMENTS",
+            "key": "targetTable"
+          },
+          {
+            "value": "CONFIRMED",
+            "key": "fieldNames"
+          },
+          {
+            "value": "{{widgets.function_get_inbound_appt_timestamp.body}}",
+            "key": "fieldValues"
+          },
+          {
+            "value": "integer",
+            "key": "fieldTypes"
+          },
+          {
+            "value": "{{widgets.function_get_user_appointment.parsed.id}}",
+            "key": "record_id"
+          }
+        ],
+        "url": "http://<URL_PREFIX>/airtable/update-record"
+      }
+    },
+    {
+      "name": "function_get_appointment_options",
+      "type": "run-function",
+      "transitions": [
+        {
+          "next": "send_app_options",
+          "event": "success"
+        },
+        {
+          "event": "fail"
+        }
+      ],
+      "properties": {
+        "service_sid": "<SERVICE_SID>",
+        "environment_sid": "<ENVIRONMENT_SID>",
+        "offset": {
+          "x": 1860,
+          "y": 2180
+        },
+        "function_sid": "<FUNCTION_SID>/apps/appointments/return-appointment-change-options",
+        "url": "http://<URL_PREFIX>/apps/appointments/return-appointment-change-options"
+      }
+    },
+    {
+      "name": "send_app_options",
+      "type": "send-and-wait-for-reply",
+      "transitions": [
+        {
+          "next": "function_pull_selected",
+          "event": "incomingMessage"
+        },
+        {
+          "event": "timeout"
+        },
+        {
+          "event": "deliveryFailure"
+        }
+      ],
+      "properties": {
+        "offset": {
+          "x": 2250,
+          "y": 2190
+        },
+        "service": "{{trigger.message.InstanceSid}}",
+        "channel": "{{trigger.message.ChannelSid}}",
+        "from": "{{flow.channel.address}}",
+        "body": "We have the following appointments times available:\n\n{% for t in widgets.function_get_appointment_options.parsed.times %}\n{{- forloop.index }}.  Tomorrow @ {{t}}\n{% endfor %}\n\nPlease reply with a number.",
+        "timeout": "180"
+      }
+    },
+    {
+      "name": "function_pull_selected",
+      "type": "run-function",
+      "transitions": [
+        {
+          "next": "send_appt_change_confirm",
+          "event": "success"
+        },
+        {
+          "event": "fail"
+        }
+      ],
+      "properties": {
+        "service_sid": "<SERVICE_SID>",
+        "environment_sid": "<ENVIRONMENT_SID>",
+        "offset": {
+          "x": 2290,
+          "y": 2460
+        },
+        "function_sid": "<FUNCTION_SID>/utilities/return-choice-from-array",
+        "parameters": [
+          {
+            "value": "{{widgets.send_app_options.inbound.Body}}",
+            "key": "ChoiceIndex"
+          },
+          {
+            "value": "{{widgets.function_get_appointment_options.body}}",
+            "key": "ArrayData"
+          },
+          {
+            "value": "times",
+            "key": "ArrayName"
+          }
+        ],
+        "url": "http://<URL_PREFIX>/utilities/return-choice-from-array"
+      }
+    },
+    {
+      "name": "send_appt_change_confirm",
+      "type": "send-and-wait-for-reply",
+      "transitions": [
+        {
+          "next": "split_appt_change_confirmed",
+          "event": "incomingMessage"
+        },
+        {
+          "event": "timeout"
+        },
+        {
+          "event": "deliveryFailure"
+        }
+      ],
+      "properties": {
+        "offset": {
+          "x": 1840,
+          "y": 2460
+        },
+        "service": "{{trigger.message.InstanceSid}}",
+        "channel": "{{trigger.message.ChannelSid}}",
+        "from": "{{flow.channel.address}}",
+        "body": "Please reply CONFIRM to change your appointment to Tomorrow @ {{widgets.function_pull_selected.body}}.",
+        "timeout": "180"
+      }
+    },
+    {
+      "name": "split_appt_change_confirmed",
+      "type": "split-based-on",
+      "transitions": [
+        {
+          "next": "send_app_options",
+          "event": "noMatch"
+        },
+        {
+          "next": "function_get_change_timestamp",
+          "event": "match",
+          "conditions": [
+            {
+              "friendly_name": "CONFIRM",
+              "arguments": [
+                "{{widgets.send_appt_change_confirm.inbound.Body}}"
+              ],
+              "type": "equal_to",
+              "value": "confirm"
+            }
+          ]
+        }
+      ],
+      "properties": {
+        "input": "{{widgets.send_appt_change_confirm.inbound.Body}}",
+        "offset": {
+          "x": 1800,
+          "y": 2720
+        }
+      }
+    },
+    {
+      "name": "function_get_change_timestamp",
+      "type": "run-function",
+      "transitions": [
+        {
+          "next": "function_update_change_appointment",
+          "event": "success"
+        },
+        {
+          "event": "fail"
+        }
+      ],
+      "properties": {
+        "service_sid": "<SERVICE_SID>",
+        "environment_sid": "<ENVIRONMENT_SID>",
+        "offset": {
+          "x": 2310,
+          "y": 2810
+        },
+        "function_sid": "<FUNCTION_SID>/utilities/return-timestamp",
+        "url": "http://<URL_PREFIX>/utilities/return-timestamp"
+      }
+    },
+    {
+      "name": "function_update_change_appointment",
+      "type": "run-function",
+      "transitions": [
+        {
+          "next": "send_appointment_confirmed",
+          "event": "success"
+        },
+        {
+          "event": "fail"
+        }
+      ],
+      "properties": {
+        "service_sid": "<SERVICE_SID>",
+        "environment_sid": "<ENVIRONMENT_SID>",
+        "offset": {
+          "x": 1890,
+          "y": 2990
+        },
+        "function_sid": "<FUNCTION_SID>/airtable/update-record",
+        "parameters": [
+          {
+            "value": "APPOINTMENTS",
+            "key": "targetTable"
+          },
+          {
+            "value": "CONFIRMED|DAY|TIME",
+            "key": "fieldNames"
+          },
+          {
+            "value": "{{widgets.function_get_change_timestamp.body}}|Tomorrow|{{widgets.function_pull_selected.body}}",
+            "key": "fieldValues"
+          },
+          {
+            "value": "integer|string|string",
+            "key": "fieldTypes"
+          },
+          {
+            "value": "{{widgets.function_get_user_appointment.parsed.id}}",
+            "key": "record_id"
+          }
+        ],
+        "url": "http://<URL_PREFIX>/airtable/update-record"
+      }
+    },
+    {
+      "name": "send_order_welcome",
+      "type": "send-and-wait-for-reply",
+      "transitions": [
+        {
+          "next": "split_order_reply",
+          "event": "incomingMessage"
+        },
+        {
+          "event": "timeout"
+        },
+        {
+          "event": "deliveryFailure"
+        }
+      ],
+      "properties": {
+        "offset": {
+          "x": 2620,
+          "y": 620
+        },
+        "service": "{{trigger.message.InstanceSid}}",
+        "channel": "{{trigger.message.ChannelSid}}",
+        "from": "{{flow.channel.address}}",
+        "body": "Welcome to our automated ordering system. Please reply with one of the following: latte, cappuccino, americano, cortado, or cold brew.",
+        "timeout": "180"
+      }
+    },
+    {
+      "name": "split_order_reply",
+      "type": "split-based-on",
+      "transitions": [
+        {
+          "next": "order_try_again",
+          "event": "noMatch"
+        },
+        {
+          "next": "send_special_conditions",
+          "event": "match",
+          "conditions": [
+            {
+              "friendly_name": "VALID ORDER",
+              "arguments": [
+                "{{widgets.send_order_welcome.inbound.Body}}"
+              ],
+              "type": "matches_any_of",
+              "value": "latte, cappuccino, americano, cortado, cold brew"
+            }
+          ]
+        }
+      ],
+      "properties": {
+        "input": "{{widgets.send_order_welcome.inbound.Body}}",
+        "offset": {
+          "x": 2920,
+          "y": 920
+        }
+      }
+    },
+    {
+      "name": "order_try_again",
+      "type": "send-message",
+      "transitions": [
+        {
+          "next": "send_order_welcome",
+          "event": "sent"
+        },
+        {
+          "event": "failed"
+        }
+      ],
+      "properties": {
+        "offset": {
+          "x": 2540,
+          "y": 910
+        },
+        "service": "{{trigger.message.InstanceSid}}",
+        "channel": "{{trigger.message.ChannelSid}}",
+        "from": "{{flow.channel.address}}",
+        "to": "{{contact.channel.address}}",
+        "body": "We did not understand that order. Please try again."
+      }
+    },
+    {
+      "name": "send_special_conditions",
+      "type": "send-and-wait-for-reply",
+      "transitions": [
+        {
+          "next": "split_special_conditions",
+          "event": "incomingMessage"
+        },
+        {
+          "next": "split_special_conditions",
+          "event": "timeout"
+        },
+        {
+          "event": "deliveryFailure"
+        }
+      ],
+      "properties": {
+        "offset": {
+          "x": 2530,
+          "y": 1190
+        },
+        "service": "{{trigger.message.InstanceSid}}",
+        "channel": "{{trigger.message.ChannelSid}}",
+        "from": "{{flow.channel.address}}",
+        "body": "Great, we will get started on your {{widgets.send_order_welcome.inbound.Body}} right away. \n\nDo you have any special request for your beverage?",
+        "timeout": "180"
+      }
+    },
+    {
+      "name": "split_special_conditions",
+      "type": "split-based-on",
+      "transitions": [
+        {
+          "next": "set_order_conditions",
+          "event": "noMatch"
+        },
+        {
+          "next": "set_empty_order_conditions",
+          "event": "match",
+          "conditions": [
+            {
+              "friendly_name": "NO",
+              "arguments": [
+                "{{widgets.send_order_welcome.inbound.Body}}"
+              ],
+              "type": "matches_any_of",
+              "value": "no,n"
+            }
+          ]
+        },
+        {
+          "next": "set_empty_order_conditions",
+          "event": "match",
+          "conditions": [
+            {
+              "friendly_name": "BLANK",
+              "arguments": [
+                "{{widgets.send_order_welcome.inbound.Body}}"
+              ],
+              "type": "is_blank",
+              "value": "Is Blank"
+            }
+          ]
+        }
+      ],
+      "properties": {
+        "input": "{{widgets.send_order_welcome.inbound.Body}}",
+        "offset": {
+          "x": 2980,
+          "y": 1200
+        }
+      }
+    },
+    {
+      "name": "set_empty_order_conditions",
+      "type": "set-variables",
+      "transitions": [
+        {
+          "next": "function_get_order_timestamp",
+          "event": "next"
+        }
+      ],
+      "properties": {
+        "variables": [
+          {
+            "value": "nothing entered",
+            "key": "beverage_details"
+          }
+        ],
+        "offset": {
+          "x": 2920,
+          "y": 1530
+        }
+      }
+    },
+    {
+      "name": "set_order_conditions",
+      "type": "set-variables",
+      "transitions": [
+        {
+          "next": "function_get_order_timestamp",
+          "event": "next"
+        }
+      ],
+      "properties": {
+        "variables": [
+          {
+            "value": "{{widgets.send_special_conditions.inbound.Body}}",
+            "key": "beverage_details"
+          }
+        ],
+        "offset": {
+          "x": 2520,
+          "y": 1480
+        }
+      }
+    },
+    {
+      "name": "function_create_new_order",
+      "type": "run-function",
+      "transitions": [
+        {
+          "next": "send_order_submited",
+          "event": "success"
+        },
+        {
+          "event": "fail"
+        }
+      ],
+      "properties": {
+        "service_sid": "<SERVICE_SID>",
+        "environment_sid": "<ENVIRONMENT_SID>",
+        "offset": {
+          "x": 2910,
+          "y": 1850
+        },
+        "function_sid": "<FUNCTION_SID>/airtable/create-record",
+        "parameters": [
+          {
+            "value": "ORDERS",
+            "key": "targetTable"
+          },
+          {
+            "value": "ContactID|Name|BEVERAGE|DETAILS|ORDER_CREATED|ORDER_STATUS",
+            "key": "fieldNames"
+          },
+          {
+            "value": "{{flow.variables.ContactID}}|{{widgets.function_get_user_record.parsed.Name}}|{{widgets.send_order_welcome.inbound.Body}}|{{flow.variables.beverage_details}}|{{widgets.function_get_order_timestamp.body}}|SUBMITTED",
+            "key": "fieldValues"
+          },
+          {
+            "value": "string|string|string|string|integer|string",
+            "key": "fieldTypes"
+          }
+        ],
+        "url": "http://<URL_PREFIX>/airtable/create-record"
+      }
+    },
+    {
+      "name": "function_get_current_order",
+      "type": "run-function",
+      "transitions": [
+        {
+          "next": "split_check_for_orders",
+          "event": "success"
+        },
+        {
+          "event": "fail"
+        }
+      ],
+      "properties": {
+        "service_sid": "<SERVICE_SID>",
+        "environment_sid": "<ENVIRONMENT_SID>",
+        "offset": {
+          "x": 3230,
+          "y": 550
+        },
+        "function_sid": "<FUNCTION_SID>/airtable/get-record-by-field",
+        "parameters": [
+          {
+            "value": "ORDERS",
+            "key": "targetTable"
+          },
+          {
+            "value": "ContactID",
+            "key": "filterFieldName"
+          },
+          {
+            "value": "{{flow.variables.ContactID}}",
+            "key": "filterFieldValue"
+          }
+        ],
+        "url": "http://<URL_PREFIX>/airtable/get-record-by-field"
+      }
+    },
+    {
+      "name": "split_check_for_orders",
+      "type": "split-based-on",
+      "transitions": [
+        {
+          "event": "noMatch"
+        },
+        {
+          "next": "send_order_welcome",
+          "event": "match",
+          "conditions": [
+            {
+              "friendly_name": "No Record",
+              "arguments": [
+                "{{widgets.function_get_current_order.body}}"
+              ],
+              "type": "is_blank",
+              "value": "Is Blank"
+            }
+          ]
+        },
+        {
+          "next": "split_order_status",
+          "event": "match",
+          "conditions": [
+            {
+              "friendly_name": "ORDER Exits",
+              "arguments": [
+                "{{widgets.function_get_current_order.body}}"
+              ],
+              "type": "is_not_blank",
+              "value": "Is Not Blank"
+            }
+          ]
+        }
+      ],
+      "properties": {
+        "input": "{{widgets.function_get_current_order.body}}",
+        "offset": {
+          "x": 3360,
+          "y": 800
+        }
+      }
+    },
+    {
+      "name": "send_order_update",
+      "type": "send-message",
+      "transitions": [
+        {
+          "event": "sent"
+        },
+        {
+          "event": "failed"
+        }
+      ],
+      "properties": {
+        "offset": {
+          "x": 3410,
+          "y": 1250
+        },
+        "service": "{{trigger.message.InstanceSid}}",
+        "channel": "{{trigger.message.ChannelSid}}",
+        "from": "{{flow.channel.address}}",
+        "to": "{{contact.channel.address}}",
+        "body": "Your order for a \"{{widgets.function_get_current_order.parsed.BEVERAGE}}\" will be ready soon! Reply to this message to receive more updates."
+      }
+    },
+    {
+      "name": "function_get_order_timestamp",
+      "type": "run-function",
+      "transitions": [
+        {
+          "next": "function_create_new_order",
+          "event": "success"
+        },
+        {
+          "event": "fail"
+        }
+      ],
+      "properties": {
+        "service_sid": "<SERVICE_SID>",
+        "environment_sid": "<ENVIRONMENT_SID>",
+        "offset": {
+          "x": 2580,
+          "y": 1760
+        },
+        "function_sid": "<FUNCTION_SID>/utilities/return-timestamp",
+        "url": "http://<URL_PREFIX>/utilities/return-timestamp"
+      }
+    },
+    {
+      "name": "send_order_submited",
+      "type": "send-message",
+      "transitions": [
+        {
+          "event": "sent"
+        },
+        {
+          "event": "failed"
+        }
+      ],
+      "properties": {
+        "offset": {
+          "x": 2640,
+          "y": 2070
+        },
+        "service": "{{trigger.message.InstanceSid}}",
+        "channel": "{{trigger.message.ChannelSid}}",
+        "from": "{{flow.channel.address}}",
+        "to": "{{contact.channel.address}}",
+        "body": "Success! We have received your order and will let you know when it is ready to be picked up.\n\nFeel free to reply to get a status update."
+      }
+    },
+    {
+      "name": "split_order_status",
+      "type": "split-based-on",
+      "transitions": [
+        {
+          "next": "send_order_update",
+          "event": "noMatch"
+        },
+        {
+          "next": "send_order_complete",
+          "event": "match",
+          "conditions": [
+            {
+              "friendly_name": "COMPLETE",
+              "arguments": [
+                "{{widgets.function_get_current_order.parsed.ORDER_STATUS}}"
+              ],
+              "type": "equal_to",
+              "value": "COMPLETE"
+            }
+          ]
+        },
+        {
+          "next": "send_order_submitted",
+          "event": "match",
+          "conditions": [
+            {
+              "friendly_name": "SUBMITTED",
+              "arguments": [
+                "{{widgets.function_get_current_order.parsed.ORDER_STATUS}}"
+              ],
+              "type": "equal_to",
+              "value": "SUBMITTED"
+            }
+          ]
+        },
+        {
+          "next": "send_order_in_progress",
+          "event": "match",
+          "conditions": [
+            {
+              "friendly_name": "IN PROGRESS",
+              "arguments": [
+                "{{widgets.function_get_current_order.parsed.ORDER_STATUS}}"
+              ],
+              "type": "equal_to",
+              "value": "IN PROGRESS"
+            }
+          ]
+        }
+      ],
+      "properties": {
+        "input": "{{widgets.function_get_current_order.parsed.ORDER_STATUS}}",
+        "offset": {
+          "x": 3710,
+          "y": 1070
+        }
+      }
+    },
+    {
+      "name": "send_order_complete",
+      "type": "send-message",
+      "transitions": [
+        {
+          "next": "function_get_order_complete_compare_timestamp",
+          "event": "sent"
+        },
+        {
+          "event": "failed"
+        }
+      ],
+      "properties": {
+        "offset": {
+          "x": 3350,
+          "y": 1770
+        },
+        "service": "{{trigger.message.InstanceSid}}",
+        "channel": "{{trigger.message.ChannelSid}}",
+        "from": "{{flow.channel.address}}",
+        "to": "{{contact.channel.address}}",
+        "body": "Great news! Your \"{{widgets.function_get_current_order.parsed.BEVERAGE}}\" is ready. Come to the counter to pick it up!"
+      }
+    },
+    {
+      "name": "send_beatles_game",
+      "type": "send-and-wait-for-reply",
+      "transitions": [
+        {
+          "next": "split_beatles_game_menu",
+          "event": "incomingMessage"
+        },
+        {
+          "event": "timeout"
+        },
+        {
+          "event": "deliveryFailure"
+        }
+      ],
+      "properties": {
+        "offset": {
+          "x": 4970,
+          "y": 550
+        },
+        "service": "{{trigger.message.InstanceSid}}",
+        "channel": "{{trigger.message.ChannelSid}}",
+        "from": "{{flow.channel.address}}",
+        "body": "We are going to send you 5 Beatles lyrics with key word(s) missing. Reply with the correct word or words to move to the next lyric. Your score is the total time it takes to get all the questions correct.\nReply BEATLES to start the timer!\nReply LEADERBOARD to see the times to beat!",
+        "timeout": "180"
+      }
+    },
+    {
+      "name": "split_beatles_game_menu",
+      "type": "split-based-on",
+      "transitions": [
+        {
+          "next": "send_beatles_game",
+          "event": "noMatch"
+        },
+        {
+          "next": "set_game_index",
+          "event": "match",
+          "conditions": [
+            {
+              "friendly_name": "BEATLES",
+              "arguments": [
+                "{{widgets.send_beatles_game.inbound.Body}}"
+              ],
+              "type": "equal_to",
+              "value": "BEATLES"
+            }
+          ]
+        },
+        {
+          "next": "function_get_leaderboard",
+          "event": "match",
+          "conditions": [
+            {
+              "friendly_name": "LEADERBOARD",
+              "arguments": [
+                "{{widgets.send_beatles_game.inbound.Body}}"
+              ],
+              "type": "equal_to",
+              "value": "LEADERBOARD"
+            }
+          ]
+        }
+      ],
+      "properties": {
+        "input": "{{widgets.send_beatles_game.inbound.Body}}",
+        "offset": {
+          "x": 5290,
+          "y": 810
+        }
+      }
+    },
+    {
+      "name": "set_game_index",
+      "type": "set-variables",
+      "transitions": [
+        {
+          "next": "function_get_game_start_timestamp",
+          "event": "next"
+        }
+      ],
+      "properties": {
+        "variables": [
+          {
+            "value": "0",
+            "key": "game_index"
+          }
+        ],
+        "offset": {
+          "x": 5200,
+          "y": 1130
+        }
+      }
+    },
+    {
+      "name": "function_get_game_start_timestamp",
+      "type": "run-function",
+      "transitions": [
+        {
+          "next": "set_game_start",
+          "event": "success"
+        },
+        {
+          "event": "fail"
+        }
+      ],
+      "properties": {
+        "service_sid": "<SERVICE_SID>",
+        "environment_sid": "<ENVIRONMENT_SID>",
+        "offset": {
+          "x": 4850,
+          "y": 1140
+        },
+        "function_sid": "<FUNCTION_SID>/utilities/return-timestamp",
+        "url": "http://<URL_PREFIX>/utilities/return-timestamp"
+      }
+    },
+    {
+      "name": "set_game_start",
+      "type": "set-variables",
+      "transitions": [
+        {
+          "next": "function_get_next_lyric",
+          "event": "next"
+        }
+      ],
+      "properties": {
+        "variables": [
+          {
+            "value": "{{widgets.function_get_game_start_timestamp.body}}",
+            "key": "game_start"
+          }
+        ],
+        "offset": {
+          "x": 4490,
+          "y": 1150
+        }
+      }
+    },
+    {
+      "name": "function_get_next_lyric",
+      "type": "run-function",
+      "transitions": [
+        {
+          "next": "send_game_lyric",
+          "event": "success"
+        },
+        {
+          "event": "fail"
+        }
+      ],
+      "properties": {
+        "service_sid": "<SERVICE_SID>",
+        "environment_sid": "<ENVIRONMENT_SID>",
+        "offset": {
+          "x": 4530,
+          "y": 1420
+        },
+        "function_sid": "<FUNCTION_SID>/airtable/get-record-by-field",
+        "parameters": [
+          {
+            "value": "GAME_QUESTIONS",
+            "key": "targetTable"
+          },
+          {
+            "value": "LYRIC_INDEX",
+            "key": "filterFieldName"
+          },
+          {
+            "value": "{{flow.variables.game_index}}",
+            "key": "filterFieldValue"
+          }
+        ],
+        "url": "http://<URL_PREFIX>/airtable/get-record-by-field"
+      }
+    },
+    {
+      "name": "send_game_lyric",
+      "type": "send-and-wait-for-reply",
+      "transitions": [
+        {
+          "next": "split_on_answer",
+          "event": "incomingMessage"
+        },
+        {
+          "event": "timeout"
+        },
+        {
+          "event": "deliveryFailure"
+        }
+      ],
+      "properties": {
+        "offset": {
+          "x": 4920,
+          "y": 1410
+        },
+        "service": "{{trigger.message.InstanceSid}}",
+        "channel": "{{trigger.message.ChannelSid}}",
+        "from": "{{flow.channel.address}}",
+        "body": "{{widgets.function_get_next_lyric.parsed.LYRIC}}",
+        "timeout": "180"
+      }
+    },
+    {
+      "name": "split_on_answer",
+      "type": "split-based-on",
+      "transitions": [
+        {
+          "event": "noMatch"
+        },
+        {
+          "next": "send_correct",
+          "event": "match",
+          "conditions": [
+            {
+              "friendly_name": "CORRECT",
+              "arguments": [
+                "{{widgets.send_game_lyric.inbound.Body}}"
+              ],
+              "type": "equal_to",
+              "value": "{{widgets.function_get_next_lyric.parsed.ANSWER}}"
+            }
+          ]
+        },
+        {
+          "next": "send_not_correct",
+          "event": "match",
+          "conditions": [
+            {
+              "friendly_name": "NOT CORRECT",
+              "arguments": [
+                "{{widgets.send_game_lyric.inbound.Body}}"
+              ],
+              "type": "not_equal_to",
+              "value": "{{widgets.function_get_next_lyric.parsed.ANSWER}}"
+            }
+          ]
+        }
+      ],
+      "properties": {
+        "input": "{{widgets.send_game_lyric.inbound.Body}}",
+        "offset": {
+          "x": 5320,
+          "y": 1410
+        }
+      }
+    },
+    {
+      "name": "send_not_correct",
+      "type": "send-message",
+      "transitions": [
+        {
+          "next": "send_game_lyric",
+          "event": "sent"
+        },
+        {
+          "event": "failed"
+        }
+      ],
+      "properties": {
+        "offset": {
+          "x": 5680,
+          "y": 1150
+        },
+        "service": "{{trigger.message.InstanceSid}}",
+        "channel": "{{trigger.message.ChannelSid}}",
+        "from": "{{flow.channel.address}}",
+        "to": "{{contact.channel.address}}",
+        "body": "Sorry, that is not correct. Try again... (answer is: {{widgets.function_get_next_lyric.parsed.ANSWER}})"
+      }
+    },
+    {
+      "name": "send_correct",
+      "type": "send-message",
+      "transitions": [
+        {
+          "next": "increment_game",
+          "event": "sent"
+        },
+        {
+          "event": "failed"
+        }
+      ],
+      "properties": {
+        "offset": {
+          "x": 5500,
+          "y": 1710
+        },
+        "service": "{{trigger.message.InstanceSid}}",
+        "channel": "{{trigger.message.ChannelSid}}",
+        "from": "{{flow.channel.address}}",
+        "to": "{{contact.channel.address}}",
+        "body": "Excellent!\n{{widgets.function_get_next_lyric.parsed.fields.SONG}}"
+      }
+    },
+    {
+      "name": "increment_game",
+      "type": "set-variables",
+      "transitions": [
+        {
+          "next": "split_check_game_progress",
+          "event": "next"
+        }
+      ],
+      "properties": {
+        "variables": [
+          {
+            "value": "{{flow.variables.game_index | plus: 1}}",
+            "key": "game_index"
+          }
+        ],
+        "offset": {
+          "x": 5050,
+          "y": 1720
+        }
+      }
+    },
+    {
+      "name": "split_check_game_progress",
+      "type": "split-based-on",
+      "transitions": [
+        {
+          "event": "noMatch"
+        },
+        {
+          "next": "function_get_next_lyric",
+          "event": "match",
+          "conditions": [
+            {
+              "friendly_name": "< 5",
+              "arguments": [
+                "{{flow.variables.game_index}}"
+              ],
+              "type": "less_than",
+              "value": "5"
+            }
+          ]
+        },
+        {
+          "next": "function_get_game_end_timestamp",
+          "event": "match",
+          "conditions": [
+            {
+              "friendly_name": "5",
+              "arguments": [
+                "{{flow.variables.game_index}}"
+              ],
+              "type": "equal_to",
+              "value": "5"
+            }
+          ]
+        }
+      ],
+      "properties": {
+        "input": "{{flow.variables.game_index}}",
+        "offset": {
+          "x": 4560,
+          "y": 1740
+        }
+      }
+    },
+    {
+      "name": "function_get_game_end_timestamp",
+      "type": "run-function",
+      "transitions": [
+        {
+          "next": "function_get_total_milliseconds",
+          "event": "success"
+        },
+        {
+          "event": "fail"
+        }
+      ],
+      "properties": {
+        "service_sid": "<SERVICE_SID>",
+        "environment_sid": "<ENVIRONMENT_SID>",
+        "offset": {
+          "x": 4580,
+          "y": 2040
+        },
+        "function_sid": "<FUNCTION_SID>/utilities/return-timestamp",
+        "url": "http://<URL_PREFIX>/utilities/return-timestamp"
+      }
+    },
+    {
+      "name": "function_get_total_milliseconds",
+      "type": "run-function",
+      "transitions": [
+        {
+          "next": "function_convert_to_seconds",
+          "event": "success"
+        },
+        {
+          "event": "fail"
+        }
+      ],
+      "properties": {
+        "service_sid": "<SERVICE_SID>",
+        "environment_sid": "<ENVIRONMENT_SID>",
+        "offset": {
+          "x": 4940,
+          "y": 2040
+        },
+        "function_sid": "<FUNCTION_SID>/utilities/return-basic-math",
+        "parameters": [
+          {
+            "value": "subtract",
+            "key": "f"
+          },
+          {
+            "value": "{{widgets.function_get_game_start_timestamp.body}}",
+            "key": "n2"
+          },
+          {
+            "value": "{{widgets.function_get_game_end_timestamp.body}}",
+            "key": "n1"
+          }
+        ],
+        "url": "http://<URL_PREFIX>/utilities/return-basic-math"
+      }
+    },
+    {
+      "name": "function_convert_to_seconds",
+      "type": "run-function",
+      "transitions": [
+        {
+          "next": "function_save_score",
+          "event": "success"
+        },
+        {
+          "event": "fail"
+        }
+      ],
+      "properties": {
+        "service_sid": "<SERVICE_SID>",
+        "environment_sid": "<ENVIRONMENT_SID>",
+        "offset": {
+          "x": 5300,
+          "y": 2030
+        },
+        "function_sid": "<FUNCTION_SID>/utilities/return-basic-math",
+        "parameters": [
+          {
+            "value": "divide",
+            "key": "f"
+          },
+          {
+            "value": "1000",
+            "key": "n2"
+          },
+          {
+            "value": "{{widgets.function_get_total_milliseconds.body}}",
+            "key": "n1"
+          }
+        ],
+        "url": "http://<URL_PREFIX>/utilities/return-basic-math"
+      }
+    },
+    {
+      "name": "function_save_score",
+      "type": "run-function",
+      "transitions": [
+        {
+          "next": "send_game_transiton",
+          "event": "success"
+        },
+        {
+          "event": "fail"
+        }
+      ],
+      "properties": {
+        "service_sid": "<SERVICE_SID>",
+        "environment_sid": "<ENVIRONMENT_SID>",
+        "offset": {
+          "x": 4750,
+          "y": 2370
+        },
+        "function_sid": "<FUNCTION_SID>/airtable/create-record",
+        "parameters": [
+          {
+            "value": "GAME_LEADERBOARD",
+            "key": "targetTable"
+          },
+          {
+            "value": "Name|Score",
+            "key": "fieldNames"
+          },
+          {
+            "value": "{{widgets.function_get_user_record.parsed.Name}}|{{widgets.function_convert_to_seconds.body}}",
+            "key": "fieldValues"
+          },
+          {
+            "value": "string|integer",
+            "key": "fieldTypes"
+          }
+        ],
+        "url": "http://<URL_PREFIX>/airtable/create-record"
+      }
+    },
+    {
+      "name": "send_game_transiton",
+      "type": "send-message",
+      "transitions": [
+        {
+          "next": "function_delay_before_leaderboard",
+          "event": "sent"
+        },
+        {
+          "event": "failed"
+        }
+      ],
+      "properties": {
+        "offset": {
+          "x": 5180,
+          "y": 2370
+        },
+        "service": "{{trigger.message.InstanceSid}}",
+        "channel": "{{trigger.message.ChannelSid}}",
+        "from": "{{flow.channel.address}}",
+        "to": "{{contact.channel.address}}",
+        "body": "Let's see how you did against everyone else..."
+      }
+    },
+    {
+      "name": "function_get_leaderboard",
+      "type": "run-function",
+      "transitions": [
+        {
+          "next": "send_leaderboard",
+          "event": "success"
+        },
+        {
+          "event": "fail"
+        }
+      ],
+      "properties": {
+        "service_sid": "<SERVICE_SID>",
+        "environment_sid": "<ENVIRONMENT_SID>",
+        "offset": {
+          "x": 5770,
+          "y": 770
+        },
+        "function_sid": "<FUNCTION_SID>/airtable/get-records",
+        "parameters": [
+          {
+            "value": "GAME_LEADERBOARD",
+            "key": "targetTable"
+          },
+          {
+            "value": "10",
+            "key": "numberRecords"
+          },
+          {
+            "value": "Score",
+            "key": "sortField"
+          }
+        ],
+        "url": "http://<URL_PREFIX>/airtable/get-records"
+      }
+    },
+    {
+      "name": "send_leaderboard",
+      "type": "send-message",
+      "transitions": [
+        {
+          "next": "function_delay_before_thanks",
+          "event": "sent"
+        },
+        {
+          "event": "failed"
+        }
+      ],
+      "properties": {
+        "offset": {
+          "x": 6020,
+          "y": 1080
+        },
+        "service": "{{trigger.message.InstanceSid}}",
+        "channel": "{{trigger.message.ChannelSid}}",
+        "from": "{{flow.channel.address}}",
+        "to": "{{contact.channel.address}}",
+        "body": "{% if widgets.function_get_leaderboard.parsed.records.size > 0 %}\nLeaderboard:\n{% for r in widgets.function_get_leaderboard.parsed.records %}\n{{- forloop.index }}.  {{r.fields.Name}} - {{r.fields.Score}} seconds\n{% endfor %}\n{% else %}\nNo leaders yet!\n{% endif %}"
+      }
+    },
+    {
+      "name": "send_game_thanks",
+      "type": "send-message",
+      "transitions": [
+        {
+          "event": "sent"
+        },
+        {
+          "event": "failed"
+        }
+      ],
+      "properties": {
+        "offset": {
+          "x": 5910,
+          "y": 1750
+        },
+        "service": "{{trigger.message.InstanceSid}}",
+        "channel": "{{trigger.message.ChannelSid}}",
+        "from": "{{flow.channel.address}}",
+        "to": "{{contact.channel.address}}",
+        "body": "Thanks for playing!"
+      }
+    },
+    {
+      "name": "function_delay_before_thanks",
+      "type": "run-function",
+      "transitions": [
+        {
+          "next": "send_game_thanks",
+          "event": "success"
+        },
+        {
+          "event": "fail"
+        }
+      ],
+      "properties": {
+        "service_sid": "<SERVICE_SID>",
+        "environment_sid": "<ENVIRONMENT_SID>",
+        "offset": {
+          "x": 5840,
+          "y": 1440
+        },
+        "function_sid": "<FUNCTION_SID>/utilities/delay-x-seconds",
+        "parameters": [
+          {
+            "value": "5",
+            "key": "seconds"
+          }
+        ],
+        "url": "http://<URL_PREFIX>/utilities/delay-x-seconds"
+      }
+    },
+    {
+      "name": "function_get_current_queue",
+      "type": "run-function",
+      "transitions": [
+        {
+          "next": "split_check_for_queue_record",
+          "event": "success"
+        },
+        {
+          "event": "fail"
+        }
+      ],
+      "properties": {
+        "service_sid": "<SERVICE_SID>",
+        "environment_sid": "<ENVIRONMENT_SID>",
+        "offset": {
+          "x": 6590,
+          "y": 520
+        },
+        "function_sid": "<FUNCTION_SID>/airtable/get-record-by-field",
+        "parameters": [
+          {
+            "value": "QUEUE",
+            "key": "targetTable"
+          },
+          {
+            "value": "ContactID",
+            "key": "filterFieldName"
+          },
+          {
+            "value": "{{flow.variables.ContactID}}",
+            "key": "filterFieldValue"
+          }
+        ],
+        "url": "http://<URL_PREFIX>/airtable/get-record-by-field"
+      }
+    },
+    {
+      "name": "split_check_for_queue_record",
+      "type": "split-based-on",
+      "transitions": [
+        {
+          "event": "noMatch"
+        },
+        {
+          "next": "send_get_queue_name",
+          "event": "match",
+          "conditions": [
+            {
+              "friendly_name": "No Record",
+              "arguments": [
+                "{{widgets.function_get_current_queue.body}}"
+              ],
+              "type": "is_blank",
+              "value": "Is Blank"
+            }
+          ]
+        },
+        {
+          "next": "function_get_queue_compare_timestamp",
+          "event": "match",
+          "conditions": [
+            {
+              "friendly_name": "Record Exits",
+              "arguments": [
+                "{{widgets.function_get_current_queue.body}}"
+              ],
+              "type": "is_not_blank",
+              "value": "Is Not Blank"
+            }
+          ]
+        }
+      ],
+      "properties": {
+        "input": "{{widgets.function_get_current_queue.body}}",
+        "offset": {
+          "x": 6800,
+          "y": 800
+        }
+      }
+    },
+    {
+      "name": "send_get_queue_name",
+      "type": "send-and-wait-for-reply",
+      "transitions": [
+        {
+          "next": "function_get_queue_enter_timestamp",
+          "event": "incomingMessage"
+        },
+        {
+          "event": "timeout"
+        },
+        {
+          "event": "deliveryFailure"
+        }
+      ],
+      "properties": {
+        "offset": {
+          "x": 6540,
+          "y": 1070
+        },
+        "service": "{{trigger.message.InstanceSid}}",
+        "channel": "{{trigger.message.ChannelSid}}",
+        "from": "{{flow.channel.address}}",
+        "body": "To join the queue, please give us your name.",
+        "timeout": "180"
+      }
+    },
+    {
+      "name": "function_add_to_queue",
+      "type": "run-function",
+      "transitions": [
+        {
+          "next": "confirm_add_to_queue",
+          "event": "success"
+        },
+        {
+          "event": "fail"
+        }
+      ],
+      "properties": {
+        "service_sid": "<SERVICE_SID>",
+        "environment_sid": "<ENVIRONMENT_SID>",
+        "offset": {
+          "x": 6560,
+          "y": 1590
+        },
+        "function_sid": "<FUNCTION_SID>/airtable/create-record",
+        "parameters": [
+          {
+            "value": "QUEUE",
+            "key": "targetTable"
+          },
+          {
+            "value": "ContactID|Name|ENTER_TIMESTAMP",
+            "key": "fieldNames"
+          },
+          {
+            "value": "{{flow.variables.ContactID}}|{{widgets.send_get_queue_name.inbound.Body}}|{{widgets.function_get_queue_enter_timestamp.body}}",
+            "key": "fieldValues"
+          },
+          {
+            "value": "string|string|integer",
+            "key": "fieldTypes"
+          }
+        ],
+        "url": "http://<URL_PREFIX>/airtable/create-record"
+      }
+    },
+    {
+      "name": "function_get_queue_enter_timestamp",
+      "type": "run-function",
+      "transitions": [
+        {
+          "next": "function_add_to_queue",
+          "event": "success"
+        },
+        {
+          "event": "fail"
+        }
+      ],
+      "properties": {
+        "service_sid": "<SERVICE_SID>",
+        "environment_sid": "<ENVIRONMENT_SID>",
+        "offset": {
+          "x": 6410,
+          "y": 1330
+        },
+        "function_sid": "<FUNCTION_SID>/utilities/return-timestamp",
+        "url": "http://<URL_PREFIX>/utilities/return-timestamp"
+      }
+    },
+    {
+      "name": "confirm_add_to_queue",
+      "type": "send-message",
+      "transitions": [
+        {
+          "event": "sent"
+        },
+        {
+          "event": "failed"
+        }
+      ],
+      "properties": {
+        "offset": {
+          "x": 6420,
+          "y": 1850
+        },
+        "service": "{{trigger.message.InstanceSid}}",
+        "channel": "{{trigger.message.ChannelSid}}",
+        "from": "{{flow.channel.address}}",
+        "to": "{{contact.channel.address}}",
+        "body": "Excellent, we have added you to the queue!"
+      }
+    },
+    {
+      "name": "function_get_queue_compare_timestamp",
+      "type": "run-function",
+      "transitions": [
+        {
+          "next": "function_get_total_milliseconds_in_queue",
+          "event": "success"
+        },
+        {
+          "event": "fail"
+        }
+      ],
+      "properties": {
+        "service_sid": "<SERVICE_SID>",
+        "environment_sid": "<ENVIRONMENT_SID>",
+        "offset": {
+          "x": 7050,
+          "y": 1070
+        },
+        "function_sid": "<FUNCTION_SID>/utilities/return-timestamp",
+        "url": "http://<URL_PREFIX>/utilities/return-timestamp"
+      }
+    },
+    {
+      "name": "function_get_total_milliseconds_in_queue",
+      "type": "run-function",
+      "transitions": [
+        {
+          "next": "function_get_total_seconds_in_queue",
+          "event": "success"
+        },
+        {
+          "event": "fail"
+        }
+      ],
+      "properties": {
+        "service_sid": "<SERVICE_SID>",
+        "environment_sid": "<ENVIRONMENT_SID>",
+        "offset": {
+          "x": 6920,
+          "y": 1320
+        },
+        "function_sid": "<FUNCTION_SID>/utilities/return-basic-math",
+        "parameters": [
+          {
+            "value": "subtract",
+            "key": "f"
+          },
+          {
+            "value": "{{widgets.function_get_queue_compare_timestamp.body}}",
+            "key": "n1"
+          },
+          {
+            "value": "{{widgets.function_get_current_queue.parsed.ENTER_TIMESTAMP}}",
+            "key": "n2"
+          }
+        ],
+        "url": "http://<URL_PREFIX>/utilities/return-basic-math"
+      }
+    },
+    {
+      "name": "send_time_in_queue",
+      "type": "send-message",
+      "transitions": [
+        {
+          "event": "sent"
+        },
+        {
+          "event": "failed"
+        }
+      ],
+      "properties": {
+        "offset": {
+          "x": 6940,
+          "y": 2180
+        },
+        "service": "{{trigger.message.InstanceSid}}",
+        "channel": "{{trigger.message.ChannelSid}}",
+        "from": "{{flow.channel.address}}",
+        "to": "{{contact.channel.address}}",
+        "body": "You current spot in the queue is:\n\n#{{widgets.function_get_queue_position.body}} \n{% assign roundedMinutes = widgets.function_get_total_minutes_in_queue.body | round %}\nYou have been waiting for {{ roundedMinutes }} minutes.\n\nYour turn is coming soon!"
+      }
+    },
+    {
+      "name": "function_get_total_seconds_in_queue",
+      "type": "run-function",
+      "transitions": [
+        {
+          "next": "function_get_total_minutes_in_queue",
+          "event": "success"
+        },
+        {
+          "event": "fail"
+        }
+      ],
+      "properties": {
+        "service_sid": "<SERVICE_SID>",
+        "environment_sid": "<ENVIRONMENT_SID>",
+        "offset": {
+          "x": 7250,
+          "y": 1320
+        },
+        "function_sid": "<FUNCTION_SID>/utilities/return-basic-math",
+        "parameters": [
+          {
+            "value": "divide",
+            "key": "f"
+          },
+          {
+            "value": "{{widgets.function_get_total_milliseconds_in_queue.body}}",
+            "key": "n1"
+          },
+          {
+            "value": "1000",
+            "key": "n2"
+          }
+        ],
+        "url": "http://<URL_PREFIX>/utilities/return-basic-math"
+      }
+    },
+    {
+      "name": "function_get_total_minutes_in_queue",
+      "type": "run-function",
+      "transitions": [
+        {
+          "next": "function_get_queue_position",
+          "event": "success"
+        },
+        {
+          "event": "fail"
+        }
+      ],
+      "properties": {
+        "service_sid": "<SERVICE_SID>",
+        "environment_sid": "<ENVIRONMENT_SID>",
+        "offset": {
+          "x": 6930,
+          "y": 1620
+        },
+        "function_sid": "<FUNCTION_SID>/utilities/return-basic-math",
+        "parameters": [
+          {
+            "value": "divide",
+            "key": "f"
+          },
+          {
+            "value": "{{widgets.function_get_total_seconds_in_queue.body}}",
+            "key": "n1"
+          },
+          {
+            "value": "60",
+            "key": "n2"
+          }
+        ],
+        "url": "http://<URL_PREFIX>/utilities/return-basic-math"
+      }
+    },
+    {
+      "name": "function_get_queue_position",
+      "type": "run-function",
+      "transitions": [
+        {
+          "next": "split_check_start_source",
+          "event": "success"
+        },
+        {
+          "event": "fail"
+        }
+      ],
+      "properties": {
+        "service_sid": "<SERVICE_SID>",
+        "environment_sid": "<ENVIRONMENT_SID>",
+        "offset": {
+          "x": 7270,
+          "y": 1620
+        },
+        "function_sid": "<FUNCTION_SID>/apps/queue/return-queue-position",
+        "parameters": [
+          {
+            "value": "QUEUE",
+            "key": "targetTable"
+          },
+          {
+            "value": "100",
+            "key": "numberRecords"
+          },
+          {
+            "value": "{{widgets.function_get_current_queue.parsed.id}}",
+            "key": "record_id"
+          },
+          {
+            "value": "ENTER_TIMESTAMP",
+            "key": "sortField"
+          }
+        ],
+        "url": "http://<URL_PREFIX>/apps/queue/return-queue-position"
+      }
+    },
+    {
+      "name": "split_check_start_source",
+      "type": "split-based-on",
+      "transitions": [
+        {
+          "event": "noMatch"
+        },
+        {
+          "next": "send_time_in_queue",
+          "event": "match",
+          "conditions": [
+            {
+              "friendly_name": "SMS",
+              "arguments": [
+                "{{flow.variables.startSource}}"
+              ],
+              "type": "equal_to",
+              "value": "sms"
+            }
+          ]
+        },
+        {
+          "next": "send_your_turn",
+          "event": "match",
+          "conditions": [
+            {
+              "friendly_name": "REST",
+              "arguments": [
+                "{{flow.variables.startSource}}"
+              ],
+              "type": "equal_to",
+              "value": "rest"
+            }
+          ]
+        }
+      ],
+      "properties": {
+        "input": "{{flow.variables.startSource}}",
+        "offset": {
+          "x": 6930,
+          "y": 1900
+        }
+      }
+    },
+    {
+      "name": "send_your_turn",
+      "type": "send-message",
+      "transitions": [
+        {
+          "next": "function_add_to_queue_completed",
+          "event": "sent"
+        },
+        {
+          "event": "failed"
+        }
+      ],
+      "properties": {
+        "offset": {
+          "x": 7610,
+          "y": 1100
+        },
+        "service": "{{trigger.message.InstanceSid}}",
+        "channel": "{{trigger.message.ChannelSid}}",
+        "from": "{{flow.channel.address}}",
+        "to": "{{contact.channel.address}}",
+        "body": "It is your turn! Please come to the counter right now."
+      }
+    },
+    {
+      "name": "function_add_to_queue_completed",
+      "type": "run-function",
+      "transitions": [
+        {
+          "next": "function_remove_from_queue",
+          "event": "success"
+        },
+        {
+          "event": "fail"
+        }
+      ],
+      "properties": {
+        "service_sid": "<SERVICE_SID>",
+        "environment_sid": "<ENVIRONMENT_SID>",
+        "offset": {
+          "x": 7650,
+          "y": 1430
+        },
+        "function_sid": "<FUNCTION_SID>/airtable/create-record",
+        "parameters": [
+          {
+            "value": "QUEUE_COMPLETED",
+            "key": "targetTable"
+          },
+          {
+            "value": "ContactID|Name|ENTER_TIMESTAMP|EXIT_TIMESTAMP|QUEUE_MINUTES",
+            "key": "fieldNames"
+          },
+          {
+            "value": "{{flow.variables.ContactID}}|{{widgets.function_get_current_queue.parsed.Name}}|{{widgets.function_get_current_queue.parsed.ENTER_TIMESTAMP}}|{{widgets.function_get_queue_compare_timestamp.body}}|{{widgets.function_get_total_minutes_in_queue.body}}",
+            "key": "fieldValues"
+          },
+          {
+            "value": "string|string|integer|integer|float",
+            "key": "fieldTypes"
+          }
+        ],
+        "url": "http://<URL_PREFIX>/airtable/create-record"
+      }
+    },
+    {
+      "name": "function_remove_from_queue",
+      "type": "run-function",
+      "transitions": [
+        {
+          "event": "success"
+        },
+        {
+          "event": "fail"
+        }
+      ],
+      "properties": {
+        "service_sid": "<SERVICE_SID>",
+        "environment_sid": "<ENVIRONMENT_SID>",
+        "offset": {
+          "x": 7700,
+          "y": 1740
+        },
+        "function_sid": "<FUNCTION_SID>/airtable/delete-record-by-id",
+        "parameters": [
+          {
+            "value": "QUEUE",
+            "key": "targetTable"
+          },
+          {
+            "value": "{{widgets.function_get_current_queue.parsed.id}}",
+            "key": "targetRecordId"
+          }
+        ],
+        "url": "http://<URL_PREFIX>/airtable/delete-record-by-id"
+      }
+    },
+    {
+      "name": "function_delay_before_leaderboard",
+      "type": "run-function",
+      "transitions": [
+        {
+          "next": "function_get_leaderboard",
+          "event": "success"
+        },
+        {
+          "event": "fail"
+        }
+      ],
+      "properties": {
+        "service_sid": "<SERVICE_SID>",
+        "environment_sid": "<ENVIRONMENT_SID>",
+        "offset": {
+          "x": 5220,
+          "y": 2640
+        },
+        "function_sid": "<FUNCTION_SID>/utilities/delay-x-seconds",
+        "parameters": [
+          {
+            "value": "5",
+            "key": "seconds"
+          }
+        ],
+        "url": "http://<URL_PREFIX>/utilities/delay-x-seconds"
+      }
+    },
+    {
+      "name": "send_order_submitted",
+      "type": "send-message",
+      "transitions": [
+        {
+          "event": "sent"
+        },
+        {
+          "event": "failed"
+        }
+      ],
+      "properties": {
+        "offset": {
+          "x": 3900,
+          "y": 1590
+        },
+        "service": "{{trigger.message.InstanceSid}}",
+        "channel": "{{trigger.message.ChannelSid}}",
+        "from": "{{flow.channel.address}}",
+        "to": "{{contact.channel.address}}",
+        "body": "We have received you order for a \"{{widgets.function_get_current_order.parsed.BEVERAGE}}\". We will start making it soon."
+      }
+    },
+    {
+      "name": "send_order_in_progress",
+      "type": "send-message",
+      "transitions": [
+        {
+          "event": "sent"
+        },
+        {
+          "event": "failed"
+        }
+      ],
+      "properties": {
+        "offset": {
+          "x": 4120,
+          "y": 1360
+        },
+        "service": "{{trigger.message.InstanceSid}}",
+        "channel": "{{trigger.message.ChannelSid}}",
+        "from": "{{flow.channel.address}}",
+        "to": "{{contact.channel.address}}",
+        "body": "Almost there! We are working on your {{widgets.function_get_current_order.parsed.BEVERAGE}}\"..."
+      }
+    },
+    {
+      "name": "function_add_to_orders_completed",
+      "type": "run-function",
+      "transitions": [
+        {
+          "next": "function_remove_from_orders",
+          "event": "success"
+        },
+        {
+          "event": "fail"
+        }
+      ],
+      "properties": {
+        "service_sid": "<SERVICE_SID>",
+        "environment_sid": "<ENVIRONMENT_SID>",
+        "offset": {
+          "x": 3310,
+          "y": 2610
+        },
+        "function_sid": "<FUNCTION_SID>/airtable/create-record",
+        "parameters": [
+          {
+            "value": "ORDERS_COMPLETED",
+            "key": "targetTable"
+          },
+          {
+            "value": "ContactID|Name|BEVERAGE|DETAILS|ORDER_CREATED|ORDER_COMPLETED|ORDER_MINUTES",
+            "key": "fieldNames"
+          },
+          {
+            "value": "{{flow.variables.ContactID}}|{{widgets.function_get_current_order.parsed.Name}}|{{widgets.function_get_current_order.parsed.BEVERAGE}}|{{widgets.function_get_current_order.parsed.DETAILS}}|{{widgets.function_get_current_order.parsed.ORDER_CREATED}}|{{widgets.function_get_order_complete_compare_timestamp.body}}|{{widgets.function_get_total_minutes_in_order.body}}",
+            "key": "fieldValues"
+          },
+          {
+            "value": "string|string|string|string|integer|integer|float",
+            "key": "fieldTypes"
+          }
+        ],
+        "url": "http://<URL_PREFIX>/airtable/create-record"
+      }
+    },
+    {
+      "name": "function_remove_from_orders",
+      "type": "run-function",
+      "transitions": [
+        {
+          "event": "success"
+        },
+        {
+          "event": "fail"
+        }
+      ],
+      "properties": {
+        "service_sid": "<SERVICE_SID>",
+        "environment_sid": "<ENVIRONMENT_SID>",
+        "offset": {
+          "x": 3700,
+          "y": 2610
+        },
+        "function_sid": "<FUNCTION_SID>/airtable/delete-record-by-id",
+        "parameters": [
+          {
+            "value": "ORDERS",
+            "key": "targetTable"
+          },
+          {
+            "value": "{{widgets.function_get_current_order.parsed.id}}",
+            "key": "targetRecordId"
+          }
+        ],
+        "url": "http://<URL_PREFIX>/airtable/delete-record-by-id"
+      }
+    },
+    {
+      "name": "function_get_order_complete_compare_timestamp",
+      "type": "run-function",
+      "transitions": [
+        {
+          "next": "function_get_total_milliseconds_in_order",
+          "event": "success"
+        },
+        {
+          "event": "fail"
+        }
+      ],
+      "properties": {
+        "service_sid": "<SERVICE_SID>",
+        "environment_sid": "<ENVIRONMENT_SID>",
+        "offset": {
+          "x": 3310,
+          "y": 2040
+        },
+        "function_sid": "<FUNCTION_SID>/utilities/return-timestamp",
+        "url": "http://<URL_PREFIX>/utilities/return-timestamp"
+      }
+    },
+    {
+      "name": "function_get_total_milliseconds_in_order",
+      "type": "run-function",
+      "transitions": [
+        {
+          "next": "function_get_total_seconds_in_order",
+          "event": "success"
+        },
+        {
+          "event": "fail"
+        }
+      ],
+      "properties": {
+        "service_sid": "<SERVICE_SID>",
+        "environment_sid": "<ENVIRONMENT_SID>",
+        "offset": {
+          "x": 3730,
+          "y": 2040
+        },
+        "function_sid": "<FUNCTION_SID>/utilities/return-basic-math",
+        "parameters": [
+          {
+            "value": "subtract",
+            "key": "f"
+          },
+          {
+            "value": "{{widgets.function_get_order_complete_compare_timestamp.body}}",
+            "key": "n1"
+          },
+          {
+            "value": "{{widgets.function_get_current_order.parsed.ORDER_CREATED}}",
+            "key": "n2"
+          }
+        ],
+        "url": "http://<URL_PREFIX>/utilities/return-basic-math"
+      }
+    },
+    {
+      "name": "function_get_total_seconds_in_order",
+      "type": "run-function",
+      "transitions": [
+        {
+          "next": "function_get_total_minutes_in_order",
+          "event": "success"
+        },
+        {
+          "event": "fail"
+        }
+      ],
+      "properties": {
+        "service_sid": "<SERVICE_SID>",
+        "environment_sid": "<ENVIRONMENT_SID>",
+        "offset": {
+          "x": 3300,
+          "y": 2320
+        },
+        "function_sid": "<FUNCTION_SID>/utilities/return-basic-math",
+        "parameters": [
+          {
+            "value": "divide",
+            "key": "f"
+          },
+          {
+            "value": "{{widgets.function_get_total_milliseconds_in_order.body}}",
+            "key": "n1"
+          },
+          {
+            "value": "1000",
+            "key": "n2"
+          }
+        ],
+        "url": "http://<URL_PREFIX>/utilities/return-basic-math"
+      }
+    },
+    {
+      "name": "function_get_total_minutes_in_order",
+      "type": "run-function",
+      "transitions": [
+        {
+          "next": "function_add_to_orders_completed",
+          "event": "success"
+        },
+        {
+          "event": "fail"
+        }
+      ],
+      "properties": {
+        "service_sid": "<SERVICE_SID>",
+        "environment_sid": "<ENVIRONMENT_SID>",
+        "offset": {
+          "x": 3710,
+          "y": 2340
+        },
+        "function_sid": "<FUNCTION_SID>/utilities/return-basic-math",
+        "parameters": [
+          {
+            "value": "divide",
+            "key": "f"
+          },
+          {
+            "value": "{{widgets.function_get_total_seconds_in_order.body}}",
+            "key": "n1"
+          },
+          {
+            "value": "60",
+            "key": "n2"
+          }
+        ],
+        "url": "http://<URL_PREFIX>/utilities/return-basic-math"
+      }
+    }
+  ]
+}
