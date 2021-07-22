@@ -1,0 +1,24 @@
+{
+  "name": "oidp-main",
+  "version": "0.0.0",
+  "private": true,
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "start": "twilio-run",
+    "deploy": "twilio-run deploy"
+  },
+  "dependencies": {
+    "twilio": "^3.56",
+    "airtable": "*"
+  },
+  "devDependencies": {
+    "twilio-run": "^3.0.1"
+  },
+  "engines": {
+    "node": "12"
+  },
+  "main": "index.js",
+  "author": "",
+  "license": "ISC",
+  "description": ""
+}
