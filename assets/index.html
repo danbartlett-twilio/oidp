@@ -196,7 +196,7 @@ template: `<div>
           and clone the Airtable base. Copy and paste the new BASE ID and your API Key below.
         </p>
         <p>
-          <a href="https://airtable.com/shrHc1g9VZ9xrTpxw" class="btn btn-info">Airtable Base Template</a>
+          <a href="https://airtable.com/shrGFr1005RId4eFb" class="btn btn-info">Airtable Base Template</a>
         </p>
         <form>
           <Setting v-for="v in dataVariables" :key="v.key" :setting="v"></Setting>
@@ -214,7 +214,7 @@ template: `<div>
           <div class="card-body">
             <p class="lead">
               If you have set all of the variables in DATA, and FLOW, you
-              can deploy the Studio Flow by clicking below.  
+              can deploy the Studio Flow by clicking below.  (click once and be patient!)
             </p>
             <button class="btn" :class="{'btn-success':flowDeployed,'btn-danger':!flowDeployed}" @click="deployStudioFlow">Deploy Flow</button>
           </div>
@@ -234,7 +234,7 @@ template: `<div>
           <div class="card-body">
             <p class="lead">
               If you have set all of the variables in DATA, FLOW, and NUMBER, you
-              can set the webhook for your FLOW to your Twilio Number.
+              can set the webhook for your FLOW to your Twilio Number. (click once and be patient!)
             </p>
             <button class="btn btn-primary" @click="updateFlowWebhook()">Set Flow Webhook</button>
           </div>
