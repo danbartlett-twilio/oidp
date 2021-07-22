@@ -9,6 +9,16 @@ The demos can be used as is, or you can customize this code base and studio flow
 You will need the following:
 
 * A Twilio Account
-* Twilio CLI
-* Serverless Plugin
 * A Twilio SMS-enabled Phone Number
+* Twilio CLI installed on your local machine
+* Serverless Plugin on your local machine
+
+## Installation
+
+1. Download the repository
+1. Run **npm init** to set the name of your service 
+1. Run **npm install** to add the dependencies
+1. Run **twilio serverless:deploy** to deploy the Service functions and assets
+1. Copy the url ending in **indexhtml** from the standard out of the deploy command and paste it in a browser
+1. Finish the setup from the web browser
+
