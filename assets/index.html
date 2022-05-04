@@ -15,6 +15,7 @@
   <script src="/js/vue/vue-router.min.js"></script>
   <script src="/js/axios.min.js"></script>
 
+
   <link rel="shortcut icon" href="/favicon.twilio.ico"/>
 </head>
 
@@ -198,6 +199,9 @@ template: `<div>
         <p>
           <a href="https://airtable.com/shrGFr1005RId4eFb" class="btn btn-info">Airtable Base Template</a>
         </p>
+        <p>
+          <a href="https://airtable.com/shrhoShgDodTJ8miL" class="btn btn-info">Airtable Base Template build in Dan's Personal Airtable Account (alternative)</a>
+        </p>        
         <form>
           <Setting v-for="v in dataVariables" :key="v.key" :setting="v"></Setting>
         </form>
